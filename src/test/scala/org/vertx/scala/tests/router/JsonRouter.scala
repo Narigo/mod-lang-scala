@@ -8,6 +8,7 @@ import org.vertx.scala.platform.Verticle
 import scala.concurrent.Promise
 import scala.util.{Try, Failure, Success}
 import org.vertx.scala.core.json.Json
+import scala.util.matching.Regex
 
 /**
  * @author <a href="http://www.campudus.com/">Joern Bernhardt</a>
@@ -21,12 +22,15 @@ class JsonRouter extends Verticle with Router {
     }: Try[HttpServer] => Unit)
   }
 
-  override def routes(req: HttpServerRequest) = {
+  val IdMatcher = "/get/(\\d+)".r
+
+  override def routes(implicit req: HttpServerRequest): Routing = {
     case Get("/") => SendFile("helloscala.txt")
     case Get("/test.txt") => SendFile("helloscala.txt")
+    case Get(IdMatcher(id)) => Ok(Json.obj("result" -> id))
     case Post("/") => Ok(Json.obj("status" -> "ok"))
     case Post("/post-ok") => Ok(Json.obj("status" -> "ok"))
-    case Head("/") => Header("x-custom-head", "hello", NoBody)
+    case Head("/head") => Header("x-custom-head", "hello", NoBody)
     case Delete("/forbidden") => Error(RouterException(message = "not authorized", statusCode = 403))
     case All("/all-test") => Ok(Json.obj("status" -> "ok"))
   }

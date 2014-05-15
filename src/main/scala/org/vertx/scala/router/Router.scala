@@ -25,24 +25,30 @@ import org.vertx.scala.router.routing.Head
 import java.net.URLEncoder
 
 /**
- * The Router trait can be extended to give access to an easy way to write nice routes for your HTTP server.
+ * The Router trait can be extended to give access to an easy way to write nice routes for your
+ * HTTP server.
  *
  * @author <a href="http://www.campudus.com/">Joern Bernhardt</a>
  */
 trait Router extends (HttpServerRequest => Unit) {
   this: VertxAccess =>
-  private implicit val executionContext = VertxExecutionContext.fromVertx(vertx, logger)
+  protected implicit val executionContext = VertxExecutionContext.fromVertx(vertx, logger)
+
+  type Routing = PartialFunction[RouteMatch, Reply]
 
   private val noRouteMatch: RouteMatch => Reply =
     _ => Error(RouterException(message = "No route matched.", id = "NO_ROUTE", statusCode = 404))
 
   private def matcherFor(routeMatch: RouteMatch, req: HttpServerRequest): Reply = {
     val pf: PartialFunction[RouteMatch, Reply] = routes(req)
-    val tryAllThenNoRouteMatch: Function[RouteMatch, Reply] = _ => pf.applyOrElse(All(req.path()), noRouteMatch)
+    val tryAllThenNoRouteMatch: Function[RouteMatch, Reply] = _ =>
+      pf.applyOrElse(All(req.path())
+        , noRouteMatch)
     pf.applyOrElse(routeMatch, tryAllThenNoRouteMatch)
   }
 
-  private def fileExists(file: String): Future[String] = asyncResultPromisify { tryFn: ResultHandler[Boolean] =>
+  private def fileExists(file: String): Future[String] = asyncResultPromisify { tryFn:
+                                                                                ResultHandler[Boolean] =>
     vertx.fileSystem.exists(file, tryFn)
   } map {
     case true => file
@@ -53,7 +59,8 @@ trait Router extends (HttpServerRequest => Unit) {
     if (path.endsWith("/")) path + "index.html"
     else path + "/index.html"
 
-  private def directoryToIndexFile(path: String): Future[String] = asyncResultPromisify { tryFn: ResultHandler[FileProps] =>
+  private def directoryToIndexFile(path: String): Future[String] = asyncResultPromisify { tryFn:
+                                                                                          ResultHandler[FileProps] =>
     vertx.fileSystem.lprops(path, tryFn)
   } flatMap { fp =>
     if (fp.isDirectory) fileExists(addIndexToDirName(path))
@@ -94,7 +101,8 @@ trait Router extends (HttpServerRequest => Unit) {
           case ex: Throwable => endResponse(req.response(), Error(routerException(ex)))
         }
       case SetCookie(key, value, nextReply) =>
-        req.response().headers().put("Set-Cookie", collection.mutable.Set(urlEncode(key) + "=" + urlEncode(value)))
+        req.response().headers().put("Set-Cookie", collection.mutable.Set(urlEncode(key) + "=" +
+          urlEncode(value)))
         sendReply(req, nextReply)
       case Header(key, value, nextReply) =>
         req.response().headers().put(key, collection.mutable.Set(urlEncode(value)))
@@ -136,14 +144,29 @@ trait Router extends (HttpServerRequest => Unit) {
     case x => RouterException(message = x.getMessage, cause = x.getCause)
   }
 
-  protected def errorReplyFromException(ex: RouterException) =
-    Error(ex)
-
+  private def errorReplyFromException(ex: RouterException) = Error(ex)
 
   /* TODO
    * error pages -> case Status404 => ?
    */
   private val notFoundFile = "404.html"
+
+
+  final protected def authed(replyIfAuthed: => Reply)(implicit req: HttpServerRequest): Reply = {
+    def unauthorized: Reply =
+      Error(RouterException(message = "Unauthorized", id = "FORBIDDEN", statusCode = 403))
+
+    AsyncReply(checkAuthentication(req) map { authenticated =>
+      if (authenticated) replyIfAuthed
+      else unauthorized
+    } recover {
+      case x => unauthorized
+    })
+  }
+
+  protected def checkAuthentication(req: HttpServerRequest): Future[Boolean] = {
+    Future.successful(false)
+  }
 
   /**
    * Override this method to define the routes of the request handler.
@@ -151,6 +174,6 @@ trait Router extends (HttpServerRequest => Unit) {
    * @param req The HttpServerRequest that came in.
    * @return A partial function that matches all routes.
    */
-  def routes(req: HttpServerRequest): PartialFunction[RouteMatch, Reply]
+  def routes(implicit req: HttpServerRequest): Routing
 
 }

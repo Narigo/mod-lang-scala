@@ -1,9 +1,7 @@
 package org.vertx.scala.tests.router
 
 import org.junit.Test
-import org.vertx.scala.testtools.TestVerticle
 import org.vertx.testtools.VertxAssert._
-import org.vertx.scala.core.http.{HttpServerRequest, HttpClientResponse}
 import org.vertx.scala.core.impl.ScalaHelpers._
 import org.vertx.scala.core.FunctionConverters._
 import scala.concurrent.{Promise, Future}
@@ -13,7 +11,7 @@ import org.vertx.scala.core.json.Json
 /**
  * @author <a href="http://www.campudus.com/">Joern Bernhardt</a>
  */
-class JsonRouterTest extends TestVerticle {
+class JsonRouterTest extends RouterTestHelper {
 
   override def asyncBefore(): Future[Unit] = promisify { p: Promise[Unit] =>
     container.deployVerticle("scala:org.vertx.scala.tests.router.JsonRouter", handler = {
@@ -46,10 +44,9 @@ class JsonRouterTest extends TestVerticle {
     assertEquals(403, res.statusCode())
   }
 
-  @Test def pathOnlyHead(): Unit = doHttp("HEAD", "/test.txt") map okCompleter { res =>
+  @Test def customHead(): Unit = doHttp("HEAD", "/head") map okCompleter { res =>
     assertTrue(res.headers().entryExists("x-custom-head", { h =>
-      assertEquals("hello", h)
-      true
+      h == "hello"
     }))
   }
 
@@ -61,29 +58,4 @@ class JsonRouterTest extends TestVerticle {
     assertEquals(testFileContents(), body)
   })
 
-  private def checkBody[T](bodyCheck: String => T): HttpClientResponse => Unit = { res =>
-    res.bodyHandler { body =>
-      bodyCheck(body.toString("UTF-8"))
-    }
-  }
-
-  private def testFileContents() = vertx.fileSystem.readFileSync("helloscala.txt").toString("UTF-8")
-
-  private def okCompleter[B](fn: HttpClientResponse => B): HttpClientResponse => Unit = { t: HttpClientResponse =>
-    assertEquals(200, t.statusCode())
-    completer(fn)(t)
-  }
-
-  private def completer[A, B](fn: A => B): A => Unit = { t: A =>
-    fn(t)
-    testComplete()
-  }
-
-  private def doHttp(method: String, uri: String): Future[HttpClientResponse] = promisify {
-    p: Promise[HttpClientResponse] =>
-      vertx.createHttpClient()
-        .setPort(8080)
-        .request(method, uri, { res => p.success(res)})
-        .end()
-  }
 }
