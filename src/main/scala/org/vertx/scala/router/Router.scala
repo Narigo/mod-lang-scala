@@ -32,7 +32,6 @@ import java.net.URLEncoder
  */
 trait Router extends (HttpServerRequest => Unit) {
   this: VertxAccess =>
-  protected implicit val executionContext = VertxExecutionContext.fromVertx(vertx, logger)
 
   type Routing = PartialFunction[RouteMatch, Reply]
 
