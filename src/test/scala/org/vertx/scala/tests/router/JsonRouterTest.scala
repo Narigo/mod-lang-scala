@@ -28,6 +28,10 @@ class JsonRouterTest extends RouterTestHelper {
     assertEquals(testFileContents(), body)
   })
 
+  @Test def missingFileSend(): Unit = doHttp("GET", "/not-found") map completer(checkBody { body =>
+    assertEquals(error404FileContents(), body)
+  })
+
   @Test def indexPost(): Unit = doHttp("POST", "/") map okCompleter(checkBody { body =>
     assertEquals("ok", Json.fromObjectString(body).getString("status"))
   })

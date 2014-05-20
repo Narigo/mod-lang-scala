@@ -12,7 +12,7 @@ case object NoBody extends SyncReply
 
 case class Ok(json: JsonObject) extends SyncReply
 
-case class SendFile(file: String) extends SyncReply
+case class SendFile(file: String, absolute: Boolean = false) extends SyncReply
 
 case class Error(ex: RouterException) extends SyncReply
 

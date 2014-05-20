@@ -27,6 +27,7 @@ class JsonRouter extends Verticle with Router {
   override def routes(implicit req: HttpServerRequest): Routing = {
     case Get("/") => SendFile("helloscala.txt")
     case Get("/test.txt") => SendFile("helloscala.txt")
+    case Get("/not-found") => SendFile("not-existing.txt")
     case Get(IdMatcher(id)) => Ok(Json.obj("result" -> id))
     case Post("/") => Ok(Json.obj("status" -> "ok"))
     case Post("/post-ok") => Ok(Json.obj("status" -> "ok"))

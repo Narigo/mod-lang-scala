@@ -35,20 +35,19 @@ trait Router extends (HttpServerRequest => Unit) {
 
   type Routing = PartialFunction[RouteMatch, Reply]
 
+  protected def workingDirectory: String = "./"
+
   private val noRouteMatch: RouteMatch => Reply =
     _ => Error(RouterException(message = "No route matched.", id = "NO_ROUTE", statusCode = 404))
 
   private def matcherFor(routeMatch: RouteMatch, req: HttpServerRequest): Reply = {
     val pf: PartialFunction[RouteMatch, Reply] = routes(req)
-    val tryAllThenNoRouteMatch: Function[RouteMatch, Reply] = _ =>
-      pf.applyOrElse(All(req.path())
-        , noRouteMatch)
+    val tryAllThenNoRouteMatch: Function[RouteMatch, Reply] = _ => pf.applyOrElse(All(req.path()), noRouteMatch)
     pf.applyOrElse(routeMatch, tryAllThenNoRouteMatch)
   }
 
-  private def fileExists(file: String): Future[String] = asyncResultPromisify { tryFn:
-                                                                                ResultHandler[Boolean] =>
-    vertx.fileSystem.exists(file, tryFn)
+  private def fileExists(file: String): Future[String] = asyncResultPromisify {
+    tryFn: ResultHandler[Boolean] => vertx.fileSystem.exists(file, tryFn)
   } map {
     case true => file
     case false => throw new FileNotFoundException(file)
@@ -58,9 +57,8 @@ trait Router extends (HttpServerRequest => Unit) {
     if (path.endsWith("/")) path + "index.html"
     else path + "/index.html"
 
-  private def directoryToIndexFile(path: String): Future[String] = asyncResultPromisify { tryFn:
-                                                                                          ResultHandler[FileProps] =>
-    vertx.fileSystem.lprops(path, tryFn)
+  private def directoryToIndexFile(path: String): Future[String] = asyncResultPromisify {
+    tryFn: ResultHandler[FileProps] => vertx.fileSystem.lprops(path, tryFn)
   } flatMap { fp =>
     if (fp.isDirectory) fileExists(addIndexToDirName(path))
     else Future.successful(path)
@@ -77,10 +75,14 @@ trait Router extends (HttpServerRequest => Unit) {
       case Ok(js) =>
         resp.setStatusCode(200)
         resp.end(js.encode())
-      case SendFile(path) =>
-        fileExists(path) flatMap directoryToIndexFile map { file =>
+      case SendFile(path, absolute) =>
+        fileExists(if (absolute) path else s"$workingDirectory/$path") flatMap directoryToIndexFile map { file =>
           logger.info(s"Serving file $file after receiving request for: $path")
           resp.sendFile(file, notFoundFile)
+        } recover {
+          case ex: FileNotFoundException =>
+            endResponse(resp, Error(RouterException("File not found", ex, "error.routing.file_not_found", 404)))
+          case ex => endResponse(resp, Error(RouterException("send file ex", ex, "error.routing.send_file", 500)))
         }
       case Error(RouterException(message, cause, id, statusCode)) =>
         logger.warn(s"Got an error $statusCode: $message", cause)

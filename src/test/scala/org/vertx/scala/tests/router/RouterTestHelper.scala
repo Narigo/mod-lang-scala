@@ -16,6 +16,9 @@ trait RouterTestHelper extends TestVerticle {
     }
   }
 
+  protected def error404FileContents() =
+    vertx.fileSystem.readFileSync("error404.html").toString("UTF-8")
+
   protected def testFileContents() =
     vertx.fileSystem.readFileSync("helloscala.txt").toString("UTF-8")
 
