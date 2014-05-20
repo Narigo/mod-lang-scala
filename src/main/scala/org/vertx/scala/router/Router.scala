@@ -74,6 +74,7 @@ trait Router extends (HttpServerRequest => Unit) {
         resp.end()
       case Ok(js) =>
         resp.setStatusCode(200)
+        resp.putHeader("Content-type", "application/json")
         resp.end(js.encode())
       case SendFile(path, absolute) =>
         fileExists(if (absolute) path else s"$workingDirectory/$path") flatMap directoryToIndexFile map { file =>
